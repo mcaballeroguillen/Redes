@@ -1,0 +1,18 @@
+
+Wed Apr 17 18:35:48 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:35:50 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:36:04 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:36:07 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:39:19 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:39:22 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:39:32 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:40:03 2019	uchile.cl	(200, 89, 76, 16)
+Wed Apr 17 18:40:42 2019	youtube.com	(64, 233, 186, 136)
+Wed Apr 17 18:40:45 2019	youtube.com	(64, 233, 186, 136)
+Wed Apr 17 18:41:03 2019	youtube.com	(64, 233, 186, 190)
+Wed Apr 17 18:41:14 2019	youtube.com	(64, 233, 186, 190)
+Wed Apr 17 18:46:15 2019	youtube.com	(64, 233, 186, 190)
+Wed Apr 17 18:46:18 2019	youtube.com	(10240, 1008, 16387, 3072, 0, 0, 0, 136)
+Wed Apr 17 18:46:23 2019	youtube.com	aspmxlgooglecom
+Wed Apr 17 18:46:30 2019	youtube.com	(64, 233, 186, 91)
+Wed Apr 17 18:47:44 2019	google.com	(64, 233, 186, 101)
