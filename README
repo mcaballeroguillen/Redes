@@ -1,0 +1,46 @@
+Requerimientos: 
+-La tarea fue realizada en Python 3.6, por lo que se recomienda usar una versión igual o superior a esta.
+-En la carpeta donde encuetra el archivo Servidor.py debe existir los archivos Black_List.json y Redirect.json, de lo
+ contrario el servidor lanzará un error de apertura de archivos.
+
+Archivo Black_List.json:
+ Este contiene los dominios que el proxi debe rechazar, en mi caso el servidor solamente escuchar pero no responde la 
+ consulta.
+ Formato ejemplo:
+    {
+ 	"Black_list":[{"Dominio": "facebook.com"},{"Dominio":"netflix.com"}] 
+	}
+
+Archivo Redirect.json:
+ Este contiene los dominios que deben ser redireccionados a una IP específica, que recalcar que solo funciona
+ las consultas de tipo A.
+ Formato ejemplo:
+	{ "Redirect":[{"Dominio":"uchile.cl","IP":"15.15.15.15"},{"Dominio":"youtube.com","IP":"2.2.2.2"}]
+
+	}
+
+Como hacerlo Funcionar:
+-Abrir el archivo Servidor.py y modificar  la penultima fila que por defecto es: 
+     Servidor1= Server(2035,"127.0.0.1","1.1.1.1",10)
+ Modifique los valores según los siguiente:
+     1° Argumento(Integer): Puerto donde va escuchar el servidor.
+     2° Argumento(String): Dirección donde escchar el servidor.
+     3° Argumento(String): Servidor DNS al que el proxi va redireccionar las consultas.
+     4° Arguemnto(Integer): Tiempo de duración de la caché en Segundos.
+-Correr el archivo Server.py
+- Realizar consultas usando dig 
+
+Requirmeintos Implementados:
+ -Realizar consultas a un servidor DNS, y reenviar a al cliente.
+ -Caché con un tiempo de vida(Segundos).
+ -Dominios que no recibiran Respuestas(Black_List.json).
+
+Requirimientos Parcialmente Implementados:
+ - Log: funciona en su mayoría, sin envargo al encotrar carácteres especificos como el @ el servidor se cae, además 
+   la codifación de las respuestas MX el punto no se muestra.
+ - Redirect: La redirección sólo funciona con consultas de tipo A, el cual su valor es una IPv4, esto debido a que el tamaño, posición      
+   de los valores de consultas tipo MX y AAAA varían, y por falta de tiempo no logre de realizar todos los casos, pero realizé un tipo 
+   para mostrar que sí se hacerlo. 
+    
+ 
+
