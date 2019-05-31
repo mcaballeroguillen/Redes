@@ -1,5 +1,4 @@
-Requerimientos: 
--La tarea fue realizada en Python 3.6, por lo que se recomienda usar una versión igual o superior a esta.
+
 -En la carpeta donde encuetra el archivo Servidor.py debe existir los archivos Black_List.json y Redirect.json, de lo
  contrario el servidor lanzará un error de apertura de archivos.
 

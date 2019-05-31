@@ -35,6 +35,12 @@ Requirmeintos Implementados:
  -Caché con un tiempo de vida(Segundos).
  -Dominios que no recibiran Respuestas(Black_List.json).
 
- 
+Requirimientos Parcialmente Implementados:
+ - Log: funciona en su mayoría, sin envargo al encotrar carácteres especificos como el @ el servidor se cae, además 
+   la codifación de las respuestas MX el punto no se muestra.
+ - Redirect: La redirección sólo funciona con consultas de tipo A, el cual su valor es una IPv4, esto debido a que el tamaño, posición      
+   de los valores de consultas tipo MX y AAAA varían, y por falta de tiempo no logre de realizar todos los casos, pero realizé un tipo 
+   para mostrar que sí se hacerlo. 
+    
  
 
