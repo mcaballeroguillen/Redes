@@ -70,7 +70,7 @@ class RouterPort(Thread):
             if data:
                 self.callback_method((data, self))
 
-    def broadcast(self, topology, name):
+    def flooding(self, topology, name):
         """
         Only sends table info about reachable
         router, from this interface
@@ -83,7 +83,7 @@ class RouterPort(Thread):
         message = json.dumps({
             'origin': name,
             'destination': "all",
-            'type': "broadcast",
+            'type': "flooding",
             'data': topology
         }).encode()
 

@@ -3,7 +3,8 @@ import sys
 from json import JSONDecodeError
 from threading import Timer, Thread
 from settings.settings import LOG, UPDATE_TIME, TOPOLOGY_CREATION_TIMEOUT, PROGRAM_UPDATE
-
+import networkx as nx
+import numpy as np
 from routing.router_port import RouterPort
 
 
@@ -16,6 +17,8 @@ class Router:
         self.distance_vectors = {self.name: self._reset_dv()}
         self.links = {self.name: (0, None)}
         self.toplogy = dict()
+        self.Adjacency_matrix = None
+        self.rute_table = dict()
 
     def _reset_dv(self):
         """
@@ -34,52 +37,56 @@ class Router:
         for port in self.ports.values():
             port.name_request()
 
-    def _compare_dvs(self, neighbour, toplogy):
+    def _compare_topology(self, neighbour, toplogy):
         """
         Compares received dv from neighbour with the last recorded one
         :param neighbour: where the dv came from
         :param toplogy: received dv
         :return:
         """
-        self._broadcast_dv(toplogy, neighbour)
+        self._flooding_topology(toplogy, neighbour)
         for enlace in toplogy.keys():
             self.toplogy[enlace] = toplogy.get(enlace)
+        self._compute_table()
 
 
-    def _compute_table(self, destinations=None):
+    def _compute_table(self):
+        Rauters_pars = self.toplogy.keys()
+        Rauster_set = set()
+        for par in Rauters_pars:
+            rauters = par.split("$$")
+            for ra in rauters:
+                Rauster_set.add(ra)
+        Rauster_set = sorted(Rauster_set)
+        matrix = []
+        for ra in Rauster_set:
 
-        """
-        modifies current routing table if necessary,
-        whenever a better routing path is found
-        :param destinations: neighbours to recompute
-        :return: void
-        """
+            vector = []
+            for ra1 in Rauster_set:
 
-        nodes = set()
+                par= ra+"$$"+ra1
+                cost = self.toplogy.get(par,0)
+                if cost==0:
+                    par = ra1+"$$"+ra
+                    cost = self.toplogy.get(par,0)
+                vector.append(cost)
+            matrix.append(vector)
 
-        for router, dv in self.distance_vectors.items():
-            for name, _ in dv.items():
-                nodes.add(name)
+        self.Adjacency_matrix = np.asmatrix(matrix)
+        rauter_index = Rauster_set.index(self.name,0)
+        x=0
+        for raute in Rauster_set:
+            G = nx.from_numpy_matrix(self.Adjacency_matrix, create_using=nx.DiGraph())
+            ruta = nx.dijkstra_path(G, rauter_index, x)
+            key = self.name + "to" + raute
+            ruta_name = []
+            for ind in ruta:
+                ruta_name.append(Rauster_set.__getitem__(ind))
+            self.rute_table[key]= ruta_name
+            x=x+1
 
-        if destinations is None:
-            destinations = nodes
-
-        for dest in destinations:
-            distance = self.distance_vectors[self.name].get(dest, (sys.maxsize, None))
-
-            for u in nodes:
-                if u in self.distance_vectors:
-                    link = self.links.get(u, (sys.maxsize, None))
-                    dv_info = self.distance_vectors[u].get(dest, (sys.maxsize, None))
-
-                    new_distance = int(link[0]) + int(dv_info[0])
-
-                    if new_distance < distance[0]:
-                        distance = (new_distance, link[1] if link[1] else dv_info[1])
-
-            self.distance_vectors[self.name][dest] = distance
-
-        self._broadcast_dv()
+        self._log(self.Adjacency_matrix)
+        self._log(self.rute_table)
 
     def _success(self, message):
         """
@@ -142,9 +149,9 @@ class Router:
                 neighbour = message['data']
                 self.links[neighbour] = (message['cost'], interface)
                 self.add_link_topology(self.name,neighbour,message['cost'])
-            elif message['type'] == "broadcast":
+            elif message['type'] == "flooding":
                 table = message.get('data', {})
-                self._compare_dvs(message['origin'], table)
+                self._compare_topology(message['origin'], table)
             elif dest in self.distance_vectors[self.name]:
                 interface = self.distance_vectors[self.name][dest][1]
                 self._log("Forwarding to port {}".format(interface.output_port))
@@ -152,29 +159,29 @@ class Router:
         else:
             self._log("Malformed packet")
 
-    def _broadcast_dv(self,topoly,name):
+    def _flooding_topology(self, topoly, name):
         """
         sends current table to neighbours
         :return: void
         """
 
         for conn in self.ports.values():
-            conn.broadcast(topoly, name)
+            conn.flooding(topoly, name)
 
-    def _broadcast(self):
+    def _flooding(self):
         """
         Internal method to broadcast
         :return: None
         """
-        self._log("Broadcasting")
+        self._log("flooding")
 
         if LOG:
             #printable_table = {k: (v[0], v[1].output_port if isinstance(v[1], RouterPort) else None) for k, v in self.distance_vectors[self.name].items()}
             printable_table = self.toplogy
             self._log(printable_table)
 
-        self._broadcast_dv(self.toplogy,self.name)
-        self.timer = Timer(UPDATE_TIME, lambda: self._broadcast())
+        self._flooding_topology(self.toplogy, self.name)
+        self.timer = Timer(UPDATE_TIME, lambda: self._flooding())
         self.timer.start()
 
     def start(self):
@@ -189,7 +196,7 @@ class Router:
 
         Timer(TOPOLOGY_CREATION_TIMEOUT, lambda: self.init_table()).start()
 
-        self.timer = Timer(UPDATE_TIME, lambda: self._broadcast())
+        self.timer = Timer(UPDATE_TIME, lambda: self._flooding())
         self.timer.start()
 
     def stop(self):
@@ -216,7 +223,7 @@ class Router:
         :return:
         """
         self._compute_table()
-        self.timer = Timer(UPDATE_TIME, lambda: self._broadcast())
+        self.timer = Timer(UPDATE_TIME, lambda: self._flooding())
         self.timer.start()
 
     def change_connection_cost(self, neighbor_name, new_cost):
