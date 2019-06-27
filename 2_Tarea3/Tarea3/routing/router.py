@@ -6,7 +6,7 @@ from settings.settings import LOG, UPDATE_TIME, TOPOLOGY_CREATION_TIMEOUT, PROGR
 import networkx as nx
 import numpy as np
 from routing.router_port import RouterPort
-
+from routing.Analyzer import Analyzer
 
 class Router:
     def __init__(self, name, ports):
@@ -14,11 +14,12 @@ class Router:
         self.ports = dict()
         self._init_ports(ports)
         self.timer = None
-        self.distance_vectors = {self.name: self._reset_dv()}
+
         self.links = {self.name: (0, None)}
         self.toplogy = dict()
         self.Adjacency_matrix = None
         self.rute_table = dict()
+        self.analizer =None
 
     def _reset_dv(self):
         """
@@ -44,13 +45,21 @@ class Router:
         :param toplogy: received dv
         :return:
         """
-        self._flooding_topology(toplogy, neighbour)
+
+        cambios =0
         for enlace in toplogy.keys():
-            self.toplogy[enlace] = toplogy.get(enlace)
-        self._compute_table()
+            costo = self.toplogy.get(enlace,None)
+            if costo==None or costo != toplogy[enlace]:
+                self.toplogy[enlace] = toplogy.get(enlace)
+                cambios = cambios +1
+
+        if cambios != 0:
+            self._flooding_topology(toplogy, neighbour)
+            self._compute_table()
 
 
     def _compute_table(self):
+        self.analizer.marcar_inicio(self.name)
         Rauters_pars = self.toplogy.keys()
         Rauster_set = set()
         for par in Rauters_pars:
@@ -73,6 +82,7 @@ class Router:
             matrix.append(vector)
 
         self.Adjacency_matrix = np.asmatrix(matrix)
+        self.analizer.compare_base(self.name,self.Adjacency_matrix)
         rauter_index = Rauster_set.index(self.name,0)
         x=0
         for raute in Rauster_set:
@@ -84,9 +94,8 @@ class Router:
                 ruta_name.append(Rauster_set.__getitem__(ind))
             self.rute_table[key]= ruta_name
             x=x+1
+        self.analizer.marcar_final(self.name)
 
-        self._log(self.Adjacency_matrix)
-        self._log(self.rute_table)
 
     def _success(self, message):
         """
@@ -152,8 +161,10 @@ class Router:
             elif message['type'] == "flooding":
                 table = message.get('data', {})
                 self._compare_topology(message['origin'], table)
-            elif dest in self.distance_vectors[self.name]:
-                interface = self.distance_vectors[self.name][dest][1]
+            elif self.name + "to" + dest in self.rute_table.keys():
+                rauter_salida = self.rute_table.get(self.name + "to" + dest)[1]
+
+                interface = self.links[self.name + "to" + dest][1]
                 self._log("Forwarding to port {}".format(interface.output_port))
                 interface.send_packet(packet)
         else:
@@ -166,8 +177,9 @@ class Router:
         """
 
         for conn in self.ports.values():
+            self.analizer.sum_paquete(self.name)
             conn.flooding(topoly, name)
-
+        self.analizer.rest_paquete(self.name)
     def _flooding(self):
         """
         Internal method to broadcast
@@ -181,8 +193,8 @@ class Router:
             self._log(printable_table)
 
         self._flooding_topology(self.toplogy, self.name)
-        self.timer = Timer(UPDATE_TIME, lambda: self._flooding())
-        self.timer.start()
+        #self.timer = Timer(UPDATE_TIME, lambda: self._flooding())
+        #self.timer.start()
 
     def start(self):
         """
@@ -236,7 +248,7 @@ class Router:
         try:
             _, interface = self.links[neighbor_name]
             self.links[neighbor_name] = (new_cost, interface)
-            self.distance_vectors[self.name][neighbor_name] = (sys.maxsize, interface)
+            self.add_link_topology(self.name,neighbor_name,new_cost)
             self.timer.cancel()
 
             Timer(PROGRAM_UPDATE, lambda: self.update_table()).start()

@@ -5,13 +5,15 @@ import sys
 import time
 from routing.router import Router
 from settings.settings import TOPOLOGY_CREATION_TIMEOUT
-
+from routing.Analyzer import Analyzer
 
 class Topology:
-    def __init__(self, topology_path):
+    def __init__(self, topology_path,analyzer):
         self.routers = {}
+        self.analyzer = analyzer
         self._start(topology_path)
         time.sleep(TOPOLOGY_CREATION_TIMEOUT)
+
 
     def _start(self, topology_path):
         """
@@ -27,6 +29,9 @@ class Topology:
         routers_data = topology.get('routers', [])
         for router in routers_data:
             routers[router['name']] = Router(router.get('name', ''), router.get('ports', []))
+
+        self.analyzer.set_rauter(routers)
+        self.analyzer.enalzar()
 
         for router in routers.values():
             router.start()
