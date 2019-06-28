@@ -8,8 +8,9 @@ from settings.settings import TOPOLOGY_CREATION_TIMEOUT
 
 
 class Topology:
-    def __init__(self, topology_path):
+    def __init__(self, topology_path,analyzer):
         self.routers = {}
+        self.analyzer = analyzer
         self._start(topology_path)
         time.sleep(TOPOLOGY_CREATION_TIMEOUT)
 
@@ -27,6 +28,9 @@ class Topology:
         routers_data = topology.get('routers', [])
         for router in routers_data:
             routers[router['name']] = Router(router.get('name', ''), router.get('ports', []))
+
+        self.analyzer.set_rauter(routers)
+        self.analyzer.enalzar()
 
         for router in routers.values():
             router.start()

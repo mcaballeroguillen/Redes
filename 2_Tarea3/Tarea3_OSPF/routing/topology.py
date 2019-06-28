@@ -84,5 +84,5 @@ class Topology:
         router2 = self._get_router(name2)
 
         if router1 and router2:
-            router1.change_connection_cost(name2, sys.maxsize)
-            router2.change_connection_cost(name1, sys.maxsize)
+            router1.change_connection_cost(name2, 0)
+            router2.change_connection_cost(name1, 0)

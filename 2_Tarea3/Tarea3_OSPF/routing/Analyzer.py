@@ -79,4 +79,5 @@ class Analyzer:
         print(self.tiempo_de_proceso)
         print("Tabla de Rutas")
         for rauter in self.rauters.values():
+            print("Tabla de Rutas de el: "+ rauter.name+ "\n")
             print(rauter.rute_table)
