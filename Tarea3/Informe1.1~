@@ -1,0 +1,1596 @@
+Integrantes:
+ - Marco Antonio Caballero .......25694063-9
+ - Santiago Rangel Mora...........26728993-k
+
+Requerimientos:
+-La tarea fue realizada en Python 3.6, por lo que se recomienda usar una versión igual o superior a esta.
+-Para la Tarea3_OSPF se utilizó las librería numpy y networkx para hacer aplicar disktra,  aplicnadolo así como aparece en esté enlace:
+
+https://stackoverflow.com/questions/14710005/dijkstras-algorithm-from-adjacency-matrix
+------------------------------------------------------------------------------------------------------------------------------------------
+Descripción de la implementación OSPF:
+
+Clases modificadas:
+-raouter
+-rauter_port
+
+La clase topology se dejo como estaba, salvo que ahora se agrega un parametro más que es un objeto analizador, que se describirá más adelante.
+
+La clase Rauter ahora tiene más atributos:
+	-topology: Diccionario donde se guarda la topología, tiendo como llave el enlace descrito así Rauter_de_inicio$$Rauter final, los 			  valores son los costos, ejemplo si hay enlace del Rauter1 al Rauter 2 de costo 5, en le diccionario se va guardar
+		   {Raueter1$$Rauter2: 5}
+	-Adjacency_matrix: Donde se guarda la matriz de adyacencia que conoce este rauter.
+	-rute_table: Tabla de Ruta, que similar a la toplogía, sin envargo la llave ahora es Router1toRouter2 y los valores son listas de 			 los rauter que debe seguir un paquete del Rauter1 para llegar al rauter 2, camino que es calculado con el algortimo de 		dijstra, ejemplo sin para Llegar del Ruater1 al Rauter 3 se debe pasar por el Rauter2 , el sistema Imprimirá:
+
+		'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3']
+
+		El cual es la ruta que debe seguir los paquetes.
+
+
+
+Al comenzar a interactuar, los rauter se manda un mensaje de "name_request" a sus vecinos inmediatos, cuando se recibe un mensaje "name_response", agreagamos ese enlace tal como la hacía la implementación anterio, pero solo para guardar las interfeaces de comunicación entre nodos,y ahora aparece un nuevo método que es:
+
+add_link_topology: esté metodo lo que hace es agregar un enlace a la topología, tal como se describió anteriormente, la llave es
+Rauter1$$Rauter2 y el valor es el costo, sin embargo aquí nos aseguramos que la concatenación de Rauter1 y Rauter2 siempre se haga en orden alfabetico,  esto para asegurarnos la unicidad de los enlaces en todas las topologías, tanto el Rauter1 y el Rauter2 van concatner los llave igual, y así cuando comparemos las topogías no tendremos problemas de unicidad de enlaces, todos los rauter abran guardado la represtenación del enlace de la misma manera, solo cambiará el costo del enlace.
+
+En vez de hacer _broadcast estos rauter hacen _flooding_topology, que es mandar un paquete con la topología que se conoce.
+
+Caudo se reciben un mensaje de flooding, se pasa al método _compare_topology que compara la topolgía del Rauter actual, con una topología que le manda un vecino,   y revisa si existe un nuevo enlace, o hay un cambio de costo de algun enlace existente.
+Si hay algo es nuevo se actualiza la toplogía y se manda a todos los vecinos, para que ellos actualizan.
+
+Esto lo saque de la clase 20-21, diapos 28.31.
+
+El objeto Rauter_port, solo se cambió el broadcast por el flooding.
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+Obejeto Analizador:
+Estos fueron creados para medir los parámetros solicitados en la tarea, existe un por cada tipo de routeo ya que la convergencia de los dos es díferent:
+
+Cosas en común:
+- Ambos cuenta el número de paquetes, esto se ve en los métodos _broadcast y _flooding_topology, los rauter le notifican al analizador cada vez que mandan un mensaje, y este lleva la cuenta de cuantos paquetes a mandado cada rauter.
+- Tiempo de proceso de tabla de rutas, cada rauter en su método _compute_table marca la hora de inicio para hacer los calculos, luego notifica al anlizador cuando ya terminó de calcular, claremente esto se va reescribir cada vez, por lo que el reporte de analizador será
+el último tiempo de calculo de la tabla de ruta de cada router.
+- Tiempo total de la convergencia, desde que el analizador se comenzado, mide el tiempo hasta que se estabiliza la red, esto cambia según el método de routeo.
+
+Como se mide la convergencia:
+	-En OSPF  al analizador se le setea la matríz de adyacensia final a la que debe llegar cada rauter, y esté  la compara con cada
+		matríz de adyacencia de todos los rauters, cuando todos tiene la misma matríz se mide el tiempo en que tardo en converger.
+	-En RIP el analizdor compara el vector de distancia del primer rauter que informó con todas las demás, si son iguales, aseguramos 		la convergencia, es decír si tengo cuantro rauters A,B,C y D, y el vecotor de distancia de A es igual a la de B,C y D, 		por 		la transetividad puedo asegurar que B=C=D.
+
+Como utilizarlo:
+Se debe llamar al método start() del anlizador en el momento en que queramos empezar a llevar los registro:
+Si queremos medir el tiempo en que convergen en OSPF los rauters de la topología 2 al inicio, corremos en el main lo siguiente:
+     base=[[0,10,10,0],
+          [10,0,10,0],
+          [10,10,0,10],
+          [0,0,10,0]]
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology2.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Vemos que comenzamos a medir cuando se crea la topología, y los rauter se empiezan a madar la info inicial, la matriz de adyacencia seteada es la matríz a la que debe llegar todos los rauters.
+
+Si queremos medir cuanto es el costo de cambiar un enlace en  RIP corremo en el main lo sigueinte:
+
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology2.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#2 a 50...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 50)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Vemos que empezmos a medir, justo antes de cambiar el costo del enlace.
+
+En recimidas cuantas, para medir el efecto de algún cambió coloque la analyzer.star() justo antes de hacer ese cambio, y si es en OSPF, se debe setear la matriz de adyacencia final.
+
+--------------------------------------------------Pruebas--------------------------------------------------------------------------
+-----------------------------------------------------Cargar Topología 1-------------------------------------------------------------------
+Costos en cargar la info inicial de la topology1 dada en los ejemplos:
+
+En Rip : el main de debe ser:
+
+if __name__ == "__main__":
+    # Con esto crean y parten la topología
+    SLEEPING_TIME = 60
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    analyzer.star()
+    topology = Topology("examples/topology.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resulado:
+
+Paquetes
+{'Router#1': 6, 'Router#2': 24, 'Router#3': 6}    Paquetes totales del sistema: 36, igual se ve que el Ruater 2 mando más paquetes, ya que
+es el que esta al medio de los 3.
+Tiempo Total  de convergencia
+122
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 64, 'Router#2': 85, 'Router#3': 143}  El tiempo por ruater en calcular su última tabla de ruta.
+
+En  OSPF  el main debe ser:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0,5,0],
+          [5,0,6],
+          [0,6,0]
+          ]
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology1.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultado:
+Paquetes
+{'Router#1': 2, 'Router#2': 3, 'Router#3': 1}  Total de Paquetes: 6
+Tiempo Total
+5
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 760, 'Router#2': 938, 'Router#3': 575}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#2', 'Router#1']}
+
+--------------------------------------------Subir costo en Topología 1------------------------------------------------------------
+Subir enlace de Rauter1 a 2 a 10:
+
+En Rip el main debe ser:
+
+
+if __name__ == "__main__":
+    # Con esto crean y parten la topología
+    SLEEPING_TIME = 60
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#2 a 10...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 10)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultado;
+Paquetes
+{'Router#1': 5, 'Router#2': 15, 'Router#3': 5}
+Tiempo Total
+120
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 51, 'Router#2': 58, 'Router#3': 58}
+
+En OSPF el main debe ser:
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0,10,0],
+          [10,0,6],
+          [0,6,0]
+          ]
+
+    # Con esto crean y parten la topología
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+
+    topology = Topology("examples/topology.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#2 a 10...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 10)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultado:
+Paquetes
+{'Router#1': 1, 'Router#2': 3, 'Router#3': 1}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 476, 'Router#2': 816, 'Router#3': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#2', 'Router#1']}
+
+--------------------------------------------Reducir costo en Topología 1------------------------------------------------------------
+
+
+Reducir enlace de Router1 a 2 a 2:
+
+
+----------RIP-------
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    analyzer = Analyzer()
+    topology = Topology("examples/topology.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 2)
+    time.sleep(SLEEPING_TIME)
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultado:
+
+Paquetes
+{'Router#1': 6, 'Router#2': 18, 'Router#3': 6}
+Tiempo Total
+120
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 236, 'Router#3': 0}
+
+
+----------OSPF-------
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0,2,0],
+          [2,0,6],
+          [0,6,0]
+          ]
+
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology2.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 2)
+    time.sleep(SLEEPING_TIME)
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultado:
+
+Paquetes
+{'Router#1': 1, 'Router#2': 3, 'Router#3': 1}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#1']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#2', 'Router#1']}
+
+--------------------------------------------Eliminiar conexión en Topología 1------------------------------------------------------------
+
+
+Elimina la conexion entre router 1 y 3
+
+----------RIP-------
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    analyzer = Analyzer()
+    topology = Topology("examples/topology.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Cortando enlace Router#1->Router#3...")
+    topology.break_connection("Router#2", "Router#3")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resulado:
+Paquetes
+{'Router#1': 1, 'Router#2': 3, 'Router#3': 1}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 134, 'Router#2': 0, 'Router#3': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#1']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#2', 'Router#1']}
+
+
+----------OSPF----------
+
+
+
+
+
+
+-----------------------------------------------------Cargar Topología 2-------------------------------------------------------------------
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    print("Creando Topología #1")
+    analyzer = Analyzer()
+    analyzer.star()
+    topology = Topology("examples/topology2.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resulado:
+Paquetes
+{'Router#1': 24, 'Router#2': 20, 'Router#3': 36, 'Router#4': 5}
+Tiempo Total
+66
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+OSPF:
+if __name__ == "__main__":
+    SLEEPING_TIME = 90
+    base=[[0,10,10,0],
+          [10,0,10,0],
+          [10,10,0,10],
+          [0,0,10,0]]
+
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology2.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Paquetes
+{'Router#1': 9, 'Router#2': 6, 'Router#3': 6, 'Router#4': 3}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 996, 'Router#2': 997, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#4': ['Router#2', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#4': ['Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#3', 'Router#1'], 'Router#4toRouter#2': ['Router#4', 'Router#3', 'Router#2']}
+
+
+
+
+--------------------------------------------Subir costo en Topología 2------------------------------------------------------------
+
+Subir el costo entre router 3 y 4 de 10 a 12
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology2.json", analyzer)
+    print("Modificando el costo de enlace Router#3->Router#4 a 12...")
+    analyzer.star()
+    topology.change_cost("Router#3", "Router#4", 12)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+  Resultados:
+
+  Paquetes
+{'Router#1': 24, 'Router#2': 16, 'Router#3': 30, 'Router#4': 4}
+Tiempo Total
+61
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 90
+    base=[[0,10,10,0],
+          [10,0,10,0],
+          [10,10,0,12],
+          [0,0,12,0]]
+
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#3->Router#4 a 12...")
+    analyzer.star()
+    topology.change_cost("Router#3", "Router#4", 12)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+Paquetes
+{'Router#1': 3, 'Router#2': 2, 'Router#3': 3, 'Router#4': 1}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1001, 'Router#2': 0, 'Router#3': 0, 'Router#4': 573}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#4': ['Router#2', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#4': ['Router#3', 'Router#4'], 'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#2': ['Router#3', 'Router#2']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#3', 'Router#1'], 'Router#4toRouter#2': ['Router#4', 'Router#3', 'Router#2']}
+
+
+
+
+
+
+
+    --------------------------------------------Reducir costo en Topología 2------------------------------------------------------------
+
+Se va a reducir el costo entre el router 3 y a 4 a 5
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology2.json", analyzer)
+    print("Modificando el costo de enlace Router#3->Router#4 a 5...")
+    analyzer.star()
+    topology.change_cost("Router#3", "Router#4", 5)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+    Paquetes
+    {'Router#1': 24, 'Router#2': 16, 'Router#3': 36, 'Router#4': 4}
+    Tiempo Total
+    40
+    Tiempo_de_Proceso_Tabla de Ruta
+    {'Router#1': 0, 'Router#2': 0, 'Router#3': 150, 'Router#4': 0}
+
+
+OSPF:
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 90
+    base=[[0,10,10,0],
+          [10,0,10,0],
+          [10,10,0,5],
+          [0,0,5,0]]
+
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#3->Router#4 a 5...")
+    analyzer.star()
+    topology.change_cost("Router#3", "Router#4", 5)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 3, 'Router#2': 2, 'Router#3': 3, 'Router#4': 0}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1034, 'Router#2': 0, 'Router#3': 0, 'Router#4': 816}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#4': ['Router#2', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#4': ['Router#3', 'Router#4'], 'Router#3toRouter#2': ['Router#3', 'Router#2']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#3', 'Router#1'], 'Router#4toRouter#2': ['Router#4', 'Router#3', 'Router#2']}
+
+
+
+
+
+--------------------------------------------Eliminiar conexión en Topología 2------------------------------------------------------------
+
+ RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    analyzer = Analyzer()
+    topology = Topology("examples/topology2.json", analyzer)
+    analyzer.star()
+    print("Cortando enlace Router#2->Router#3...")
+    topology.break_connection("Router#2", "Router#3")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Paquetes
+{'Router#1': 30, 'Router#2': 16, 'Router#3': 36, 'Router#4': 5}
+Tiempo Total
+62
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 90
+    base=[[0,10,10,0],
+          [10,0,0,0],
+          [10,0,0,10],
+          [0,0,10,0]]
+
+    print("Creando Topología #2")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology2.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    topology.break_connection("Router#2", "Router#3")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+
+Paquetes
+{'Router#1': 3, 'Router#2': 2, 'Router#3': 3, 'Router#4': 1}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#1', 'Router#3'], 'Router#2toRouter#4': ['Router#2', 'Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#1', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#4': ['Router#3', 'Router#4'], 'Router#3toRouter#1': ['Router#3', 'Router#1']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#3', 'Router#1'], 'Router#4toRouter#2': ['Router#4', 'Router#3', 'Router#1', 'Router#2']}
+
+
+-----------------------------------------------------Cargar Topología 3-------------------------------------------------------------------
+
+
+RIP:
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 20
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    analyzer.star()
+    topology = Topology("examples/topology3.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 10, 'Router#2': 21, 'Router#3': 14}
+Tiempo Total
+42
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0, 50, 4],
+           [50, 0, 1],
+           [4, 1, 0]]
+
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology3.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 4, 'Router#2': 6, 'Router#3': 2}
+Tiempo Total
+5
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 1000, 'Router#3': 1065}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#3', 'Router#2']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#3', 'Router#1']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1']}
+
+
+
+--------------------------------------------Subir costo en Topología 3------------------------------------------------------------
+
+
+
+Se va a incrementar el costo entre el router 3 y 1 a 10
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 20
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology3.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#3 a 10...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router3", 10)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+Paquetes
+{'Router#1': 6, 'Router#2': 9, 'Router#3': 6}
+Tiempo Total
+40
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0, 50, 10],
+           [50, 0, 1],
+           [10, 1, 0]]
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology3.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#3 a 10...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#3", 10)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+    Resultados:
+
+    Paquetes
+{'Router#1': 2, 'Router#2': 3, 'Router#3': 2}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 63, 'Router#2': 0, 'Router#3': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#3', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#3', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1']}
+
+    --------------------------------------------Reducir costo en Topología 3------------------------------------------------------------
+
+    Se va a incrementar el costo entre el router 3 y 1 a 1
+
+    RIP:
+
+
+    if __name__ == "__main__":
+        SLEEPING_TIME = 20
+        print("Creando Topología #3")
+        analyzer = Analyzer()
+        topology = Topology("examples/topology3.json", analyzer)
+        time.sleep(SLEEPING_TIME)
+        print("Modificando el costo de enlace Router#1->Router#3 a 1...")
+        analyzer.star()
+        topology.change_cost("Router#1", "Router#3", 10)
+        time.sleep(SLEEPING_TIME)
+        print("Deteniendo topología...")
+        topology.stop_topology()
+        time.sleep(SLEEPING_TIME)
+        analyzer.print_result()
+
+
+
+
+    Resultados:
+
+    Paquetes
+{'Router#1': 8, 'Router#2': 9, 'Router#3': 8}
+Tiempo Total
+40
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+
+
+    OSPF:
+
+
+    if __name__ == "__main__":
+        SLEEPING_TIME = 30
+        base=[[0, 50, 1],
+               [50, 0, 1],
+               [1, 1, 0]]
+        print("Creando Topología #3")
+        analyzer = Analyzer()
+        analyzer.set_base(np.asmatrix(base))
+        topology = Topology("examples/topology3.json",analyzer)
+        time.sleep(SLEEPING_TIME)
+        print("Modificando el costo de enlace Router#1->Router#3 a 1...")
+        analyzer.star()
+        topology.change_cost("Router#1", "Router#3", 1)
+        time.sleep(SLEEPING_TIME)
+        print("Deteniendo topología...")
+        topology.stop_topology()
+        time.sleep(SLEEPING_TIME)
+        analyzer.print_result()
+
+    Resultados:
+
+    Paquetes
+    {'Router#1': 2, 'Router#2': 3, 'Router#3': 0}
+    Tiempo Total
+    7
+    Tiempo_de_Proceso_Tabla de Ruta
+    {'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+    Tabla de Rutas
+    Tabla de Rutas de el: Router#1
+
+    {'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#3', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3']}
+    Tabla de Rutas de el: Router#2
+
+    {'Router#2toRouter#1': ['Router#2', 'Router#3', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+    Tabla de Rutas de el: Router#3
+
+    {'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1']}
+
+
+
+
+    --------------------------------------------Eliminiar conexión en Topología 3------------------------------------------------------------
+
+Se va a eliminar la conexion entre el router 1 y 2
+
+
+RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 20
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology3.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    print("Cortando enlace Router#1->Router#2...")
+    topology.break_connection("Router#1", "Router#2")
+    time.sleep(SLEEPING_TIME)
+    # Con esto detienen los nodos
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+Paquetes
+{'Router#1': 4, 'Router#2': 6, 'Router#3': 2}
+Tiempo Total
+40
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+
+
+OSPF:
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base=[[0, 0, 1],
+           [0, 0, 1],
+           [1, 1, 0]]
+
+    print("Creando Topología #3")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology3.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Cortando enlace Router#1->Router#2...")
+    analyzer.star()
+    topology.break_connection("Router#1", "Router#2")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 2, 'Router#2': 0, 'Router#3': 2}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#3', 'Router#2']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#3', 'Router#1']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1']}
+
+
+--------------------------------------------Cargar Topología 4------------------------------------------------------------
+
+RIP:
+
+Resultados:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    analyzer.star()
+    topology = Topology("examples/topology4.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Paquetes
+{'Router#1': 42, 'Router#2': 45, 'Router#3': 54, 'Router#4': 24}
+Tiempo Total
+126
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 95, 'Router#2': 110, 'Router#3': 50, 'Router#4': 53}
+
+
+
+OSPF:
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    base= [[0, 10, 10, 0],
+     [10, 0, 10, 5],
+     [10, 10, 0, 10],
+     [0, 5, 10, 0]]
+
+
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology4.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 12, 'Router#2': 12, 'Router#3': 9, 'Router#4': 6}
+Tiempo Total
+9
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1991, 'Router#2': 0, 'Router#3': 432, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#4': ['Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#4': ['Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1']}
+
+
+---------------------------------------------------------------Subir costo en Topología 4----------------------------------------------------------------------------------------------
+
+
+Se va a incrementar el costo entre el router 2 y 4 a 15
+
+RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology4.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#4 a 15...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#4", 15)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 9, 'Router#2': 12, 'Router#3': 15, 'Router#4': 8}
+Tiempo Total
+121
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 87, 'Router#3': 79, 'Router#4': 148}
+
+
+OSPF:
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    base= [[0, 10, 10, 0],
+     [10, 0, 10, 15],
+     [10, 10, 0, 10],
+     [0, 15, 10, 0]]
+
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology4.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#4 a 15...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#4", 15)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+
+
+Paquetes
+{'Router#1': 3, 'Router#2': 3, 'Router#3': 3, 'Router#4': 2}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#4': ['Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#4': ['Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#1': ['Router#4', 'Router#3', 'Router#1']}
+
+
+
+
+---------------------------------------------------------------Reducir costo en Topología 4----------------------------------------------------------------------------------------------
+
+Se va a reducir el costo del router 2 al 4 a 1
+
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology4.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#4 a 15...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#4", 1)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 6, 'Router#2': 12, 'Router#3': 6, 'Router#4': 4}
+Tiempo Total
+42
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    base= [[0, 10, 10, 0],
+     [10, 0, 10, 15],
+     [10, 10, 0, 10],
+     [0, 15, 10, 0]]
+
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology4.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#4 a 1...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#4", 1)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 3, 'Router#2': 3, 'Router#3': 3, 'Router#4': 2}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#4': ['Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#4': ['Router#3', 'Router#4'], 'Router#3toRouter#2': ['Router#3', 'Router#2']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1']}
+
+
+
+
+--------------------------------------------Eliminiar conexión en Topología 4------------------------------------------------------------
+
+
+
+Se va a eliminar la conexion entre el router 1 y 3
+
+RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology4.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    print("Cortando enlace Router#1->Router#3...")
+    topology.break_connection("Router#1", "Router#3")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+Paquetes
+{'Router#1': 9, 'Router#2': 9, 'Router#3': 9, 'Router#4': 4}
+Tiempo Total
+41
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+OSPF:
+
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base= [[0, 10, 0, 0],
+     [10, 0, 10, 5],
+     [0, 10, 0, 10],
+     [0, 5, 10, 0]]
+
+    print("Creando Topología #4")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology4.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Cortando enlace Router#1->Router#3...")
+    analyzer.star()
+    topology.break_connection("Router#1", "Router#3")
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+
+
+
+Paquetes
+{'Router#1': 0, 'Router#2': 3, 'Router#3': 3, 'Router#4': 2}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 755, 'Router#2': 0, 'Router#3': 898, 'Router#4': 714}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#2', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#4': ['Router#2', 'Router#4'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#2', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#4': ['Router#3', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#3': ['Router#4', 'Router#3'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1']}
+
+
+--------------------------------------------Cargar Topología 5------------------------------------------------------------
+
+
+RIP:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    analyzer.star()
+    topology = Topology("examples/topology5.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+Resultados:
+
+Paquetes
+{'Router#1': 24, 'Router#2': 30, 'Router#3': 18, 'Router#4': 4}
+Tiempo Total
+42
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    base= [[0, 10, 0, 0],
+     [10, 0, 10, 5],
+     [0, 10, 0, 0],
+     [0, 5, 0, 0]]
+
+
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    analyzer.star()
+    topology = Topology("examples/topology5.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 6, 'Router#2': 6, 'Router#3': 4, 'Router#4': 2}
+Tiempo Total
+5
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1008, 'Router#2': 1042, 'Router#3': 0, 'Router#4': 965}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#4': ['Router#2', 'Router#4'], 'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#4': ['Router#3', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1'], 'Router#4toRouter#3': ['Router#4', 'Router#2', 'Router#3']}
+
+
+
+--------------------------------------------Subir costo en Topología 5------------------------------------------------------------
+
+
+Se va a incrementar el costo entre el router 2 y 3 a 20
+
+
+
+RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 20
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology5.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#3 a 20...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#3", 20)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 6, 'Router#2': 9, 'Router#3': 6, 'Router#4': 2}
+Tiempo Total
+40
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+
+OSPF:
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base= [[0, 10, 10, 0],
+     [10, 0, 20, 5],
+     [10, 20, 0, 0],
+     [0, 5, 0, 0]]
+
+
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology5.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#2->Router#3 a 20...")
+    analyzer.star()
+    topology.change_cost("Router#2", "Router#3", 20)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1886, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#4': ['Router#2', 'Router#4'], 'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#4': ['Router#3', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1'], 'Router#4toRouter#3': ['Router#4', 'Router#2', 'Router#3']}
+
+
+--------------------------------------------Reducir costo en Topología 5------------------------------------------------------------
+
+se va a reducir el costo del router 1 a 2 a 2
+
+
+RIP:
+if __name__ == "__main__":
+    SLEEPING_TIME = 60
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology5.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#2 a 2...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 2)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 6, 'Router#2': 12, 'Router#3': 6, 'Router#4': 2}
+Tiempo Total
+40
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 364, 'Router#2': 0, 'Router#3': 0, 'Router#4': 0}
+
+
+
+
+OSPF:
+
+if __name__ == "__main__":
+    SLEEPING_TIME = 30
+    base= [[0, 2, 10, 0],
+     [2, 0, 10, 5],
+     [10, 10, 0, 0],
+     [0, 5, 0, 0]]
+
+
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    analyzer.set_base(np.asmatrix(base))
+    topology = Topology("examples/topology5.json",analyzer)
+    time.sleep(SLEEPING_TIME)
+    print("Modificando el costo de enlace Router#1->Router#2 a 2...")
+    analyzer.star()
+    topology.change_cost("Router#1", "Router#2", 2)
+    time.sleep(SLEEPING_TIME)
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+
+Paquetes
+{'Router#1': 3, 'Router#2': 3, 'Router#3': 2, 'Router#4': 1}
+Tiempo Total
+8
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 914, 'Router#2': 0, 'Router#3': 952, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#3': ['Router#2', 'Router#3'], 'Router#2toRouter#4': ['Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#4': ['Router#3', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#1'], 'Router#4toRouter#3': ['Router#4', 'Router#2', 'Router#3']}
+
+
+
+--------------------------------------------Eliminar conexion en Topología 5-------------------------------------------------------------------------------------------------------------
+
+Se va a eliminar la conexion entre el router 1 y 2
+
+
+RIP:
+
+
+
+if __name__ == "__main__":
+    # Con esto crean y parten la topología
+    SLEEPING_TIME = 60
+    print("Creando Topología #5")
+    analyzer = Analyzer()
+    topology = Topology("examples/topology5.json", analyzer)
+    time.sleep(SLEEPING_TIME)
+    analyzer.star()
+    print("Cortando enlace Router#1->Router#2...")
+    topology.break_connection("Router#1", "Router#2")
+    time.sleep(SLEEPING_TIME)
+    # Con esto detienen los nodos
+    print("Deteniendo topología...")
+    topology.stop_topology()
+    time.sleep(SLEEPING_TIME)
+    analyzer.print_result()
+
+
+Resultados:
+
+Paquetes
+{'Router#1': 8, 'Router#2': 9, 'Router#3': 8, 'Router#4': 3}
+Tiempo Total
+41
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 0, 'Router#2': 0, 'Router#3': 214, 'Router#4': 0}
+
+
+    OSPF:
+
+
+    if __name__ == "__main__":
+        SLEEPING_TIME = 30
+        base= [[0, 0, 10, 0],
+         [0, 0, 10, 5],
+         [10, 10, 0, 0],
+         [0, 5, 0, 0]]
+
+
+        print("Creando Topología #5")
+        analyzer = Analyzer()
+        analyzer.set_base(np.asmatrix(base))
+        topology = Topology("examples/topology5.json",analyzer)
+        time.sleep(SLEEPING_TIME)
+        print("Cortando enlace Router#1->Router#2...")
+        analyzer.star()
+        topology.break_connection("Router#1", "Router#2")
+        time.sleep(SLEEPING_TIME)
+        # Con esto detienen los nodos
+        print("Deteniendo topología...")
+        topology.stop_topology()
+        time.sleep(SLEEPING_TIME)
+        analyzer.print_result()
+
+
+Resultados:
+
+
+
+Paquetes
+{'Router#1': 3, 'Router#2': 3, 'Router#3': 2, 'Router#4': 1}
+Tiempo Total
+7
+Tiempo_de_Proceso_Tabla de Ruta
+{'Router#1': 1165, 'Router#2': 97, 'Router#3': 0, 'Router#4': 0}
+Tabla de Rutas
+Tabla de Rutas de el: Router#1
+
+{'Router#1toRouter#1': ['Router#1'], 'Router#1toRouter#2': ['Router#1', 'Router#3', 'Router#2'], 'Router#1toRouter#3': ['Router#1', 'Router#3'], 'Router#1toRouter#4': ['Router#1', 'Router#3', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#2
+
+{'Router#2toRouter#1': ['Router#2', 'Router#3', 'Router#1'], 'Router#2toRouter#2': ['Router#2'], 'Router#2toRouter#4': ['Router#2', 'Router#4'], 'Router#2toRouter#3': ['Router#2', 'Router#3']}
+Tabla de Rutas de el: Router#3
+
+{'Router#3toRouter#1': ['Router#3', 'Router#1'], 'Router#3toRouter#3': ['Router#3'], 'Router#3toRouter#2': ['Router#3', 'Router#2'], 'Router#3toRouter#4': ['Router#3', 'Router#2', 'Router#4']}
+Tabla de Rutas de el: Router#4
+
+{'Router#4toRouter#2': ['Router#4', 'Router#2'], 'Router#4toRouter#4': ['Router#4'], 'Router#4toRouter#1': ['Router#4', 'Router#2', 'Router#3', 'Router#1'], 'Router#4toRouter#3': ['Router#4', 'Router#2', 'Router#3']}

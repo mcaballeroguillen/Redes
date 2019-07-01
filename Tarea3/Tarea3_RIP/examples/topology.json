@@ -1,0 +1,43 @@
+{
+  "routers": [
+    {
+      "name": "Router#1",
+      "ports": [
+        {
+          "input": 12345,
+          "output": 12346,
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "name": "Router#2",
+      "ports": [
+        {
+          "input": 12346,
+          "output": 12345,
+          "cost": 5
+        },
+        {
+          "input": 4321,
+          "output": 4444
+        },
+        {
+          "input": 5656,
+          "output": 5555,
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "name": "Router#3",
+      "ports": [
+        {
+          "input": 5555,
+          "output": 5656,
+          "cost": 6
+        }
+      ]
+    }
+  ]
+}

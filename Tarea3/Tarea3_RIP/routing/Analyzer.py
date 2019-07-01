@@ -11,7 +11,7 @@ class Analyzer:
         self.paquetes ={}
         self.time_max={}
         self.v_star = False
-        self.base = None
+        self.base = {}
         self.terminados= set()
 
     def star(self):
@@ -29,28 +29,46 @@ class Analyzer:
             self.tiempo_de_proceso[rauter.name]=0
 
 
-    def set_base(self,new_base):
-        self.base=new_base
+    def set_vd(self,rauter_name,vd):
+        self.base[rauter_name]=vd
+        self.compare_VD()
 
-    def compare_base(self,rauter_name,matrix_adya):
+    def compare_VD(self):
         if self.v_star:
-            matriz_adyace = matrix_adya
-            matriz_adyace = np.asarray(matriz_adyace)
-            base = np.asarray(self.base)
-            indx=0
-            resp=True
-            resp= len(matriz_adyace)==len(base)
+            resp=len(self.base)==len(self.rauters)  #Primero verifico si tengo todos los VD
             if resp:
-                for vector in matriz_adyace:
-                    resp = np.array_equal(vector,base[indx])
-                    if resp==False:
+                rauter1=None
+                for rauter in self.base.keys():
+                    rauter1=rauter
+                    break
+                vd_r1 = self.base[rauter1]    # Saco el primer vector de distancia
+                for rauterx in self.base.keys():
+                    vd_rx = self.base[rauterx]
+                    if len(vd_rx)!= len(vd_r1): #Sin los vectores tienen tamaño diferente.
+                        resp=False
                         break
-                    indx = indx+1
-            if resp==True:
-                self.terminados.add(rauter_name)
-                if len(self.rauters)==len(self.terminados):
-                    self.timpo_de_final = datetime.datetime.now()
-                    self.v_star=False
+                    for rauterx1 in vd_r1.keys():
+                        vd_rauter1 = vd_r1[rauterx1] # Valor del Rauter 1
+                        vd_rauter2 = vd_rx.get(rauterx1,None)
+                        if vd_rauter2 == None:
+                            resp=False
+                            break
+                        for r_final in vd_rauter1.keys():
+                            tuple_1 = vd_rauter1[r_final]
+                            tuple_2 = vd_rauter2.get(r_final,None)
+                            if tuple_2==None:
+                                resp=False
+                                break
+                            if tuple_1[0]!=tuple_2[0] or tuple_1[1]!=tuple_2[1]:  #Si tiene valores distintos
+                                resp=False
+                                break
+                            if resp==False:
+                                break
+                    if resp ==False:
+                        break
+            if resp:
+                self.v_star=False
+                self.timpo_de_final = datetime.datetime.now()
 
     def sum_paquete(self,rauter_name):
         if self.v_star:
@@ -77,9 +95,7 @@ class Analyzer:
         if self.timpo_de_final==None:
             self.timpo_de_final=datetime.datetime.now()
         print((self.timpo_de_final - self.timpo_de_inicio).seconds)
+
         print("Tiempo_de_Proceso_Tabla de Ruta")
         print(self.tiempo_de_proceso)
-        print("Tabla de Rutas")
-        for rauter in self.rauters.values():
-            print("Tabla de Rutas de el: "+ rauter.name+ "\n")
-            print(rauter.rute_table)
+
